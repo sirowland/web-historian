@@ -12,8 +12,8 @@ var fetchHtml = require('../workers/htmlfetcher.js');
 
 exports.paths = {
   siteAssets: path.join(__dirname, '../web/public'),
-  archivedSites: path.join(__dirname, '../archives/sites'),
-  list: path.join(__dirname, '../archives/sites.txt')
+  archivedSites: path.join(__dirname, '../web/archives/sites'),
+  list: path.join(__dirname, '../web/archives/sites.txt')
 };
 
 // Used for stubbing paths for tests, do not modify
@@ -29,45 +29,61 @@ exports.initialize = function(pathsObj) {
 exports.readListOfUrls = function(callback) {
   var sitesArr = [];
   fs.readFile(exports.paths.list, function(err, data) {
-    sitesArr = data.toString().split('\n');
-    callback(sitesArr);
+    if (data) {
+      sitesArr = data.toString().split('\n');
+      sitesArr.pop();
+    }
+
+    if (callback) {
+      callback(sitesArr);
+    }
   });
 };
 
 exports.isUrlInList = function(url, callback) {
-  fs.readFile(exports.paths.list, function(err, data) {
-    if (data.toString().split('\n').indexOf(url) !== -1) {
-      callback(true);
-    } else {
-      callback(false);
-    }
+  // fs.readFile(exports.paths.list, function(err, data) {
+  //   if (data) {
+  //     if (data.toString().split('\n').indexOf(url) !== -1) {
+  //       callback(true);
+  //     } else {
+  //       callback(false);
+  //     }
+  //   }
+  // });
+  exports.readListOfUrls(function(sites) {
+    var found = _.any(sites, function(site, i) {
+      return site.match(url);
+    });
+    callback(found);
   });
 };
 
 exports.addUrlToList = function(url, callback) {
-  fs.writeFile(exports.paths.list, url, callback);
+  console.log('here')
+  fs.appendFile(exports.paths.list, url + '\n', function(err, file) {
+    if (err) throw err;
+    console.log('appended file')
+    callback();
+  });
 };
 
 exports.isUrlArchived = function(url, callback) {
-  fs.readdir(exports.paths.archivedSites, function(err, data) {
-    if (data.indexOf(url) !== -1) {
-      callback(true);
-    } else {                              
-      callback(false);
-    }
+  var sitePath = path.join(exports.paths.archivedSites, url);
+
+  fs.access(sitePath, function(err) {
+    callback(!err);
   });
 };
 
 exports.downloadUrls = function(urls) {
-
-  fetchHtml();
-  // for (var i = 0; i < urls.length; i++) {
-  //   exports.isUrlArchived(urls[i], function(isFound) {
-  //     if (!isFound) {
-  //       //call html fetcher 
-  //     }
-  //   });
-  // }
+  for (var i = 0; i < urls.length; i++) {
+    var url = urls[i];
+    exports.isUrlArchived(url, function(isFound) {
+      if (!isFound) {
+        fetchHtml(url);
+      }
+    });
+  }
 };
 
 
